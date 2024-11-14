@@ -96,6 +96,13 @@ class TryonDataset(Dataset):
         self.config = config
         self.mode = config['MODE'] #train or test
         self.dataroot = config['TRAINING_CONFIG']['DATA_DIR'] if self.mode == 'train' else config['VAL_CONFIG']['DATA_DIR']
+
+        file_path = os.path.abspath(__file__)
+        # main_path = os.path.dirname(file_path) # ../code/main
+        code_path = os.path.dirname(os.path.dirname(os.path.dirname(file_path)))
+        self.dataroot = os.path.join(code_path, self.dataroot)
+
+        
         self.w = config['TRAINING_CONFIG']['RESOLUTION'][1]
         self.h = config['TRAINING_CONFIG']['RESOLUTION'][0]
         self.tuck = config['TUCK']
@@ -169,8 +176,8 @@ class TryonDataset(Dataset):
 
     def warping_top(self, cloth_rgb, cloth_pose, human_pose, c_parse_array, sleeve_type):
         # Measure human body length
-        human_shoulder_length = get_dist(human_pose[2],human_pose[5])
-        human_limb_length = 0
+        human_shoulder_length = get_dist(human_pose[2],human_pose[5]) # Khoảng cách 2 vai
+        human_limb_length = 0 # Độ dài cánh tay
         limbs = [(2,3), (3,4), (5,6), (6,7)]
         for limb in limbs:
             if human_pose[limb[0]].sum() == 0 or human_pose[limb[1]].sum() == 0:
@@ -178,18 +185,18 @@ class TryonDataset(Dataset):
             human_limb_length = max(human_limb_length, get_dist(human_pose[limb[0]],human_pose[limb[1]]))
 
         if self.adj_pose == 'custom':
-            human_torso_length = get_dist(human_pose[1],human_pose[8])
-            human_waist_length = get_dist(human_pose[9],human_pose[12])
+            human_torso_length = get_dist(human_pose[1],human_pose[8]) # Khoảng cách từ cổ đến hông
+            human_waist_length = get_dist(human_pose[9],human_pose[12])     # độ dài eo ...
 
             # Get cloth shoulder length
-            cloth_shoulder_length = get_dist(cloth_pose[2],cloth_pose[5])
+            cloth_shoulder_length = get_dist(cloth_pose[2],cloth_pose[5]) # Khoảng cách 2 vai trên áo
             
-            # Get body ratio
-            limb_ratio = human_limb_length / human_shoulder_length
-            torso_ratio = human_torso_length / human_shoulder_length
-            waist_ratio = human_waist_length / human_shoulder_length
+            # Get body ratio: tính tỉ lệ cơ thể
+            limb_ratio = human_limb_length / human_shoulder_length # Tỷ lệ cánh tay so với vai
+            torso_ratio = human_torso_length / human_shoulder_length # Tỷ lệ thân so với vai
+            waist_ratio = human_waist_length / human_shoulder_length # Tỷ lệ eo so với vai
 
-            # Start adjusting
+            # Start adjusting: Bắt đầu điều chỉnh
             cloth_pose_adjusted = cloth_pose.copy()
             cloth_pose_adjusted[3] = cloth_pose_adjusted[2] + get_uintVec(cloth_pose[2], cloth_pose[3]) * cloth_shoulder_length * limb_ratio #right_elbow
             cloth_pose_adjusted[4] = cloth_pose_adjusted[3] + get_uintVec(cloth_pose[3], cloth_pose[4]) * cloth_shoulder_length * limb_ratio #right_wrist
