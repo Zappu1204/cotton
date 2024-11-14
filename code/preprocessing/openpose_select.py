@@ -45,13 +45,12 @@ def pose_valid_check(skeleton):
 
     return True
 
-
-    
-
-
 def openpose_check(opt):
-    data_folder = os.path.join(opt.root, opt.brand)
-    processed_dir = os.path.join('pose_filtered_Data', opt.brand)
+    file_path = os.path.abspath(__file__)
+    code_path = os.path.dirname(os.path.dirname(os.path.dirname(file_path)))
+    Data_path = os.path.join(code_path, 'Data')
+    data_folder = os.path.join(Data_path, opt.root, opt.brand)
+    processed_dir = os.path.join(Data_path, 'pose_filtered_Data', opt.brand)
     
     os.makedirs(processed_dir, exist_ok=True)
 
@@ -82,26 +81,32 @@ def openpose_check(opt):
             skeleton = np.array(pose['people'][0]['pose_keypoints_2d']).reshape(-1, 3)
 
             valid = pose_valid_check(skeleton)
-            if valid:
-                shutil.copy2(data.replace('pose', 'model').replace('_keypoints.json', '.jpg'), temp_model_folder)
-                if opt.multi_product:
-                    products = [
-                        data.replace('pose', 'product').replace('model_keypoints.json', 'product_{}.jpg'.format(i)) for
-                        i in range(1, 5)]
-                    for product in products:
+            if not opt.nocheck:
+                if valid:
+                    shutil.copy2(data.replace('pose', 'model').replace('_keypoints.json', '.jpg'), temp_model_folder)
+                    if opt.multi_product:
+                        products = [
+                            data.replace('pose', 'product').replace('model_keypoints.json', 'product_{}.jpg'.format(i)) for
+                            i in range(1, 5)]
+                        for product in products:
+                            if os.path.isfile(product):
+                                shutil.copy2(product, temp_product_folder)
+                    else:
+                        product = data.replace('pose', 'product').replace('model_keypoints.json', 'product.jpg')
                         if os.path.isfile(product):
                             shutil.copy2(product, temp_product_folder)
+                    shutil.copy2(data, temp_pose_folder)
                 else:
-                    product = data.replace('pose', 'product').replace('model_keypoints.json', 'product.jpg')
-                    shutil.copy2(product, temp_product_folder)
-                shutil.copy2(data, temp_pose_folder)
+                    temp_garbage += 1
             else:
-                temp_garbage += 1
+                pass
         print(temp_garbage, len(poses))
         total_garbage += temp_garbage
     print("Total disgard {} images.".format(total_garbage))
 
 if __name__ == "__main__":
+    import time
+    start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--brand",
                         type=str,
@@ -111,8 +116,11 @@ if __name__ == "__main__":
                         default=None)
     parser.add_argument("--root",
                         type=str,
-                        default='raw_Data')  
+                        default='')  
+    parser.add_argument("--nocheck", action='store_true')
     parser.add_argument("--multi-product", action='store_true')          
     opt = parser.parse_args()
 
     openpose_check(opt)
+
+    print("Openpose select time: {:.4f}".format(time.time() - start))

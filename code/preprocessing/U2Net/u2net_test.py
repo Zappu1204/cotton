@@ -23,6 +23,7 @@ from model import U2NETP # small version u2net 4.7 MB
 import argparse
 from tqdm import tqdm
 import cv2
+import time
 
 tensor_transform_woResize = transforms.Compose([  \
                             transforms.ToTensor(),   \
@@ -53,17 +54,22 @@ def save_output(image_name,pred,d_dir):
 
 
 def main(opt):
-
+    file_path = os.path.abspath(__file__)
+    code_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(file_path))))
+    Data_path = os.path.join(code_path, 'Data')
+    data_folder = os.path.join(Data_path, opt.root, opt.brand)
+    # print("data_folder = ", data_folder)
     # --------- 1. get image path and name ---------
     model_name='u2net'#u2netp
 
-    cat_list = [opt.cat] if opt.cat is not None else [os.path.basename(cat) for cat in glob.glob(os.path.join(opt.root, opt.brand, '*'))]
+    # cat_list = [opt.cat] if opt.cat is not None else [os.path.basename(cat) for cat in glob.glob(os.path.join(opt.root, opt.brand, '*'))]
+    cat_list = [opt.cat] if opt.cat is not None else [os.path.basename(cat) for cat in glob.glob(os.path.join(data_folder, '*'))]
     print(cat_list)
     for cat in cat_list:
         print('='*10 + " {} -- {} ".format(opt.brand, cat) + "="*20)
 
-        input_dir = os.path.join(opt.root, opt.brand, cat, 'product')
-        output_dir = os.path.join(opt.root, opt.brand, cat, 'product-mask')
+        input_dir = os.path.join(data_folder, cat, 'product')
+        output_dir = os.path.join(data_folder, cat, 'product-mask')
         model_dir = os.path.join('saved_models', model_name, model_name + '.pth')
 
         img_name_list = glob.glob(input_dir + os.sep + '*')
@@ -89,6 +95,7 @@ def main(opt):
             net = U2NETP(3,1)
 
         if torch.cuda.is_available():
+            print("using GPU")
             net.load_state_dict(torch.load(model_dir))
             net.cuda()
         else:
@@ -123,6 +130,7 @@ def main(opt):
             del d1,d2,d3,d4,d5,d6,d7
 
 if __name__ == "__main__":
+    start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--brand",
                         type=str,
@@ -132,7 +140,7 @@ if __name__ == "__main__":
                         default=None)
     parser.add_argument("--root",
                         type=str,
-                        default='../parse_filtered_Data')          
+                        default='parse_filtered_Data')          
     opt = parser.parse_args()
-
     main(opt)
+    print("Product mask generation (U2Net) Time: {:.4f}".format(time.time() - start))

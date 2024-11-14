@@ -78,9 +78,15 @@ CIHP parsing class definition:
 def merge_20to15(CIHP_folder, ATR_folder, output_folder):
 
     CIHP_parse_imgs = glob.glob(os.path.join(CIHP_folder, '*.png'))
-    CIHP_parse_imgs.sort(key=lambda x:int(os.path.basename(x).split('_')[0]))
+    try:
+        CIHP_parse_imgs.sort(key=lambda x:int(os.path.basename(x).split('_')[0]))
+    except:
+        CIHP_parse_imgs.sort(key=lambda x:int(os.path.basename(x).split('.')[0])[1:])
     ATR_parse_imgs = glob.glob(os.path.join(ATR_folder, '*.png'))
-    ATR_parse_imgs.sort(key=lambda x:int(os.path.basename(x).split('_')[0]))
+    try:
+        ATR_parse_imgs.sort(key=lambda x:int(os.path.basename(x).split('_')[0]))
+    except:
+        ATR_parse_imgs.sort(key=lambda x:int(os.path.basename(x).split('.')[0])[1:])
 
     assert(len(CIHP_parse_imgs) == len(ATR_parse_imgs))
 
@@ -137,19 +143,28 @@ def merge_20to15(CIHP_folder, ATR_folder, output_folder):
 
 
 def merge_label(opt):
-    data_folder = os.path.join(opt.root, opt.brand)
+    file_path = os.path.abspath(__file__)
+    code_path = os.path.dirname(os.path.dirname(os.path.dirname(file_path)))
+    Data_path = os.path.join(code_path, 'Data')
+    data_folder = os.path.join(Data_path, opt.root, opt.brand)
+    # print(data_folder)
+
+    # data_folder = os.path.join(opt.root, opt.brand)
     cats = [os.path.basename(name) for name in glob.glob(os.path.join(data_folder, '*'))]
+    print(cats)
     for cat in cats:
         print('='*20 + cat + '='*20)
-        tar_dir = os.path.join(opt.root, opt.brand, cat, 'parsing_merge')
+        tar_dir = os.path.join(Data_path, opt.root, opt.brand, cat, 'parsing_merge')
         os.makedirs(tar_dir, exist_ok=True)
         os.makedirs(os.path.join(tar_dir, "vis"), exist_ok=True)
         CIHP_folder = os.path.join(data_folder, cat, 'CIHP')
         ATR_folder = os.path.join(data_folder, cat, 'ATR')
         merge_20to15(CIHP_folder, ATR_folder, tar_dir)
-
+        
 
 if __name__=='__main__':
+    import time
+    start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--brand",
                         type=str,
@@ -163,3 +178,4 @@ if __name__=='__main__':
     opt = parser.parse_args()
 
     merge_label(opt)
+    print('Merge label time: {:.4f}'.format(time.time() - start_time))

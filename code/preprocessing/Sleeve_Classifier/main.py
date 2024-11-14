@@ -205,7 +205,8 @@ def test(opt):
         # 0 is sleeve, 1 is sleeveless
         info_format = {
             "sleeve_type": prediction.reshape(-1).tolist(),
-                }
+            "product_type": "top",
+        }
         # print(pose_format)
         save_info_name = os.path.join(opt.output_dir, '{}.json'.format(imgNames[0]))
         if os.path.isfile(save_info_name):
@@ -220,6 +221,7 @@ def test(opt):
                 json.dump(info_format, f)
 
 if __name__ == '__main__':
+    start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode",
                         type=str,
@@ -258,8 +260,13 @@ if __name__ == '__main__':
     elif opt.mode == 'val':
         val(opt)
     elif opt.mode == 'preprocess':
+        import time
         opt.mode = 'test'
-        data_folder = os.path.join('../parse_filtered_Data', opt.brand)
+        file_path = os.path.abspath(__file__)
+        code_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(file_path))))
+        Data_path = os.path.join(code_path, 'Data')
+        data_folder = os.path.join(Data_path, 'parse_filtered_Data', opt.brand)
+        # data_folder = os.path.join('../parse_filtered_Data', opt.brand)
         cats = [opt.cat] if opt.cat else [os.path.basename(cat) for cat in glob.glob(os.path.join(data_folder, '*'))]
         for cat in cats:
             print(cat)
@@ -267,6 +274,6 @@ if __name__ == '__main__':
             opt.input_dir = os.path.join(cat_folder, 'product')
             opt.output_dir = os.path.join(cat_folder, 'product_info')
             test(opt)
+        print("Product Classification Time {:.4f}".format(time.time() - start_time))
     else:
         test(opt)
-

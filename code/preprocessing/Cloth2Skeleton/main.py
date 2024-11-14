@@ -296,6 +296,7 @@ def test(config):
 
 
 if __name__ == '__main__':
+    start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode",
                         type=str,
@@ -303,23 +304,34 @@ if __name__ == '__main__':
                         help="operation mode")
     parser.add_argument("--input_dir",
                         type=str,
-                        default=None)
+                        default='product/product')
     parser.add_argument("--output_dir",
                         type=str,
-                        default=None)
+                        default='product/product_pose')
     parser.add_argument("--config",
                         type=str,
                         default='configs/config_top_v2_allData.yaml')
     parser.add_argument("--vis",
                         type=bool,
                         default=False)
+    parser.add_argument("--brand",
+                        type=str,
+                        default='MyExample')
+    parser.add_argument("--root",
+                        type=str,
+                        default='Training_Dataset/1024x768')
     opt = parser.parse_args()
+
+    file_path = os.path.abspath(__file__)
+    code_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(file_path))))
+    Data_path = os.path.join(code_path, 'Data')
+    data_folder = os.path.join(Data_path, opt.root, opt.brand)
 
     config = yaml.load(open(opt.config, 'r'), Loader=yaml.FullLoader)
     config['MODE'] = opt.mode
     config['TRAINING_CONFIG']['VIS'] = opt.vis
-    config['TEST_CONFIG']['INPUT_DIR'] = opt.input_dir
-    config['TEST_CONFIG']['OUTPUT_DIR'] = opt.output_dir
+    config['TEST_CONFIG']['INPUT_DIR'] = os.path.join(data_folder, opt.input_dir)
+    config['TEST_CONFIG']['OUTPUT_DIR'] = os.path.join(data_folder, opt.output_dir)
 
     print(opt)
 
@@ -329,4 +341,5 @@ if __name__ == '__main__':
         val(config)
     elif opt.mode == 'test':
         test(config)
+        print('Cloth2Skeleton time: {:.4f}'.format(time.time()-start))
 

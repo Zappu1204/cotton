@@ -244,6 +244,11 @@ def validate(opt):
 
 
 def test(opt):
+    file_path = os.path.abspath(__file__)
+    code_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(file_path))))
+    Data_path = os.path.join(code_path, 'Data')
+    data_folder = os.path.join(Data_path, opt.root, opt.brand)
+
     # Create model
     model = models.segmentation.fcn_resnet50(num_classes=NUM_CLASS, pretrained_backbone=True).cuda().eval()
     colormap = [[0,0,0], [61,245,61], [250,250,55]]
@@ -254,13 +259,17 @@ def test(opt):
     model.load_state_dict(checkpoint['state_dict'])
 
     # Original validation Set
-    dataset_test = Cloth_Segmentation_Dataset(mode='test', path=opt.input_dir)
+    input_folder = os.path.join(data_folder, opt.input_dir)
+    print('input_folder:', input_folder)
+    dataset_test = Cloth_Segmentation_Dataset(mode='test', path=input_folder)
     dataloader_test = DataLoader(dataset=dataset_test, batch_size=1, num_workers=11, drop_last=True, shuffle=True)
         
     pbar = tqdm(dataloader_test, desc='testing')
     correct = 0
 
     output_folder = opt.output_dir
+    output_folder = os.path.join(data_folder, output_folder)
+    print('output_folder:', output_folder)
     if not os.path.isdir(output_folder):
         os.mkdir(output_folder)
 
@@ -292,6 +301,7 @@ def test(opt):
 
 
 if __name__ == '__main__':
+    start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode",
                         type=str,
@@ -305,11 +315,11 @@ if __name__ == '__main__':
                         help="model path for inference")
     parser.add_argument("--input_dir",
                         type=str,
-                        default='cloth_segmentation_dataset/images',
+                        default='product/product',
                         help="model path for inference")
     parser.add_argument("--output_dir",
                         type=str,
-                        default='test_output',
+                        default='product/product_parsing',
                         help="model path for inference")
     parser.add_argument("--n_epochs",
                         type=int,
@@ -324,6 +334,12 @@ if __name__ == '__main__':
                         # default=0.00005,
                         default=0.001,
                         help="adam: learning rate")
+    parser.add_argument("--root",
+                        type=str,
+                        default='Training_Dataset/1024x768')
+    parser.add_argument("--brand",
+                        type=str,
+                        default='MyExample')
 
 
 
@@ -336,5 +352,4 @@ if __name__ == '__main__':
         validate(opt)
     else:
         test(opt)
-
-# 
+        print('ClothSegmentation time: {:.4f}'.format(time.time() - start))

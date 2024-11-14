@@ -357,14 +357,19 @@ def parsing_gen(input_dir, output_dir):
     coord.join(threads)
 
 if __name__ == '__main__':
+    start_time = time.time()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", default='../pose_filtered_Data', type=str, help='Name of category')
+    parser.add_argument("--root", default='pose_filtered_Data', type=str, help='Name of category')
     parser.add_argument("--brand", default='Example_top', type=str, help='Name of category')
     parser.add_argument("--cat", default=None, type=str, help='Name of category')
     opt = parser.parse_args()
     print(opt)
-    cat_list = [opt.cat] if opt.cat is not None else [os.path.basename(cat) for cat in glob.glob(os.path.join(opt.root, opt.brand, '*'))]
+    file_path = os.path.abspath(__file__)
+    code_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(file_path))))
+    Data_path = os.path.join(code_path, 'Data')
+    cat_list = [opt.cat] if opt.cat is not None else [os.path.basename(cat) for cat in glob.glob(os.path.join(Data_path, opt.root, opt.brand, '*'))]
     print(cat_list)
     for cat in cat_list:
         print('='*10 + " {} -- {} ".format(opt.brand, cat) + "="*20)
-        parsing_gen(os.path.join(opt.root, opt.brand, cat, 'model'), os.path.join(opt.root, opt.brand, cat, 'CIHP'))
+        parsing_gen(os.path.join(Data_path, opt.root, opt.brand, cat, 'model'), os.path.join(Data_path, opt.root, opt.brand, cat, 'CIHP'))
+    print("CIHP process {:.4f} sec".format(time.time() - start_time))

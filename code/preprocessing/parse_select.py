@@ -61,8 +61,12 @@ def parse_valid_check(parse, cloth_type):
 
 
 def parse_check(opt):
-    data_folder = os.path.join(opt.root, opt.brand)
-    processed_dir = os.path.join('parse_filtered_Data', opt.brand)
+    file_path = os.path.abspath(__file__)
+    code_path = os.path.dirname(os.path.dirname(os.path.dirname(file_path)))
+    Data_path = os.path.join(code_path, 'Data')
+    data_folder = os.path.join(Data_path, opt.root, opt.brand)
+    processed_dir = os.path.join(Data_path, 'parse_filtered_Data', opt.brand)
+
     cloth_type = opt.brand.split('_')[-1]
 
     os.makedirs(processed_dir, exist_ok=True)
@@ -106,8 +110,15 @@ def parse_check(opt):
                         if os.path.isfile(product):
                             shutil.copy2(product, temp_product_folder)
                 else:
-                    product = data.replace('CIHP', 'product').replace('model.png', 'product.jpg')
-                    shutil.copy2(product, temp_product_folder)
+                    # product = data.replace('CIHP', 'product').replace('model.png', 'product.jpg')
+                    # shutil.copy2(product, temp_product_folder)
+                    product = data.replace('CIHP', 'product').replace('.png', '.jpg')
+                    if os.path.exists(product):
+                        shutil.copy2(product, temp_product_folder)
+                    else:
+                        product = data.replace('CIHP', 'product').replace('model.png', 'product.jpg')
+                        if os.path.isfile(product):
+                            shutil.copy2(product, temp_product_folder)
 
                 shutil.copy2(data, temp_CIHP_folder)
                 shutil.copy2(os.path.join(os.path.dirname(data), 'vis', os.path.basename(data)), temp_CIHP_vis_folder)
@@ -118,6 +129,8 @@ def parse_check(opt):
     print("Total disgard {} images.".format(total_garbage))
 
 if __name__ == "__main__":
+    import time
+    start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--brand",
                         type=str,
@@ -130,5 +143,5 @@ if __name__ == "__main__":
                         default='pose_filtered_Data')          
     parser.add_argument("--multi-product", action='store_true')          
     opt = parser.parse_args()
-
     parse_check(opt)
+    print('Parse select time: {:.4f}'.format(time.time() - start))

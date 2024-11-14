@@ -309,10 +309,19 @@ def build_dataset(opt):
     output_folder = os.path.join(new_dataset, opt.brand)
     model_folder = os.path.join(output_folder, 'model')
     product_folder = os.path.join(output_folder, 'product')
+    os.makedirs(model_folder, exist_ok=True)
+    os.makedirs(product_folder, exist_ok=True)
 
-    alignHuman(data_folder, model_folder, shape=(opt.h, opt.w))
-    alignProduct(data_folder, product_folder, shape=(opt.h, opt.w), cloth_type=opt.brand.split('_')[-1])
-    train_val_split(data_folder, output_folder)
+    match opt.mode:
+        case 'p_model':
+            alignHuman(data_folder, model_folder, shape=(opt.h, opt.w))
+        case 'p_product':
+            alignProduct(data_folder, product_folder, shape=(opt.h, opt.w), cloth_type=opt.brand.split('_')[-1])
+        case 'train_val_split':
+            train_val_split(data_folder, output_folder)
+    # alignHuman(data_folder, model_folder, shape=(opt.h, opt.w))
+    # alignProduct(data_folder, product_folder, shape=(opt.h, opt.w), cloth_type=opt.brand.split('_')[-1])
+    # train_val_split(data_folder, output_folder)
 
 
 
@@ -328,11 +337,12 @@ if __name__=='__main__':
                         default=None)
     parser.add_argument("--root",
                         type=str,
-                        default='parse_filtered_Data')     
+                        default='parse_filtered_Data')
+    parser.add_argument("-m", "--mode", type=str, default='p_model', choices=['p_model', 'p_product', 'train_val_split'])
     parser.add_argument("--h", type=int, default=1024)          
     parser.add_argument("--w", type=int, default=768)          
     parser.add_argument("--keep_order", type=bool, default=False)          
     opt = parser.parse_args()
     build_dataset(opt)
 
-    print('Build dataset time: {:.4f}'.format(time.time() - start_time))
+    print('Build form data time: {:.4f}'.format(time.time() - start_time))

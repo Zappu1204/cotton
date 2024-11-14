@@ -69,7 +69,7 @@ def get_arguments():
                         default=None)
     parser.add_argument("--root",
                         type=str,
-                        default='../parse_filtered_Data')    
+                        default='parse_filtered_Data')    
     return parser.parse_args()
 
 
@@ -98,6 +98,8 @@ def get_palette(num_cls):
 
 
 def main():
+    import time
+    start_time = time.time()
     args = get_arguments()
 
     gpus = [int(i) for i in args.gpu.split(',')]
@@ -127,7 +129,12 @@ def main():
         transforms.Normalize(mean=[0.406, 0.456, 0.485], std=[0.225, 0.224, 0.229])
     ])
 
-    data_folder = os.path.join(args.root, args.brand)
+    file_path = os.path.abspath(__file__)
+    code_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(file_path))))
+    Data_path = os.path.join(code_path, 'Data')
+    data_folder = os.path.join(Data_path, args.root, args.brand)
+
+    # data_folder = os.path.join(args.root, args.brand)
     cats = glob.glob(os.path.join(data_folder, '*'))
 
     for cat in cats:
@@ -169,6 +176,7 @@ def main():
                 if args.logits:
                     logits_result_path = os.path.join(args.output_dir, img_name[:-4] + '.npy')
                     np.save(logits_result_path, logits_result)
+    print('Self Correction Human Parsing time: {:.4f}'.format(time.time() - start_time))
     return
 
 
