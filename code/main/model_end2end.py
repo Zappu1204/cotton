@@ -4,7 +4,7 @@ import torch.nn as nn
 
 import torch.nn.functional as F
 import numpy as np
-from unet import UNet, UNet_v2
+from main.unet import UNet, UNet_v2
 from torchvision import models
 
 
