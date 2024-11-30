@@ -1,10 +1,24 @@
 import gradio as gr
 import subprocess
 import os
+import sys
+from tqdm import tqdm
+import yaml
 import shutil
 import fnmatch
 import time
 from PIL import Image
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import main.util.utils as utils
+
+import torch
+
+from torch.utils.data import DataLoader
+
+from main.dataLoader import TryonDataset
+from main.model_end2end import COTTON
 
 def copy_file_by_name(src_dir, dst_dir, file_name):
     """
@@ -48,6 +62,7 @@ def run_inference(brand):
     start_time = time.time()
     # Data/Training_Dataset/1024x768/example_gradio
     mode = "inference"
+    data_dir = os.path.join(Data_path, 'Training_Dataset/1024x768', brand)
     gradio_txt = os.path.join(Data_path, dataset_name, brand, "gradio.txt")
 
     if choose_model_name is not None and choose_product_name is not None:
@@ -78,15 +93,55 @@ def run_inference(brand):
         with open(gradio_txt, "w") as f:
             f.write(content)
         
-    os.chdir(os.path.join(cotton_dir, "code", "main"))
+    # os.chdir(os.path.join(cotton_dir, "code", "main"))
 
-    print("========= Virtual Try-on =========")
-    subprocess.run([
-        "python", "main.py",
-        "--config", "configs/config_top_COTTON.yaml",
-        "--mode", mode,
-        "--brand", brand
-    ], check=True)
+    # print("========= Virtual Try-on =========")
+    # subprocess.run([
+    #     "python", "main.py",
+    #     "--config", "configs/config_top_COTTON.yaml",
+    #     "--mode", mode,
+    #     "--brand", brand
+    # ], check=True)
+    config['VAL_CONFIG']['DATA_DIR'] = data_dir
+    config['MODE'] = mode
+    dataset = TryonDataset(config)
+    # dataloader = DataLoader(dataset, batch_size=config['VAL_CONFIG']['BATCH_SIZE'], \
+    #                         shuffle=True, num_workers=config['TRAINING_CONFIG']['NUM_WORKER'])
+    dataloader = DataLoader(
+        dataset,
+        batch_size=config['VAL_CONFIG']['BATCH_SIZE'],
+        shuffle=True,
+        num_workers=config['TRAINING_CONFIG']['NUM_WORKER'],
+    )
+    for step, batch in enumerate(tqdm(dataloader)):
+        # Name
+        c_name = batch["c_name"]
+
+        # Input
+        human_masked = batch['human_masked'].cuda()
+        human_pose = batch['human_pose'].cuda()
+        human_parse_masked = batch['human_parse_masked'].cuda()
+        c_aux = batch['c_aux_warped'].cuda()
+        c_torso = batch['c_torso_warped'].cuda()
+
+        # Supervision
+        # human_img = batch['human_img'].cuda()
+        # human_parse_label = batch['human_parse_label'].cuda()
+        # human_parse_masked_label = batch['human_parse_masked_label'].cuda()
+
+        # print("c_torso.size() = {} [{}, {}]".format(c_torso.size(), torch.min(c_torso), torch.max(c_torso)))
+        # print("c_aux.size() = {} [{}, {}]".format(c_aux.size(), torch.min(c_aux), torch.max(c_aux)))
+        # print("human_parse_masked.size() = {} [{}, {}]".format(human_parse_masked.size(), torch.min(human_parse_masked), torch.max(human_parse_masked)))
+        # print("human_masked.size() = {} [{}, {}]".format(human_masked.size(), torch.min(human_masked), torch.max(human_masked)))
+        # print("human_pose.size() = {} [{}, {}]".format(human_pose.size(), torch.min(human_pose), torch.max(human_pose)))
+        # exit()
+
+        with torch.no_grad():
+            c_img = torch.cat([c_torso, c_aux], dim=1)
+            parsing_pred, parsing_pred_hard, tryon_img_fakes = model_pkl(c_img, human_parse_masked, human_masked, human_pose)
+        fid_pred_folder = os.path.join(cotton_dir, "code/main/result/Top_1024x768_COTTON", mode, brand, "1")
+        for idx, tryon_img_fake in enumerate(tryon_img_fakes):
+            utils.imsave_trainProcess([utils.remap(tryon_img_fake)], os.path.join(fid_pred_folder, c_name[idx]))
 
     end_time = time.time()
     inference_elapsed_time = end_time - start_time
@@ -318,6 +373,20 @@ def main():
     for product in os.listdir(example_product_path):
         if product.endswith(".jpg"):
             example_product_list.append([os.path.join(example_product_path, product), product])
+
+    config_path = os.path.join(cotton_dir, "code", "main", "configs", "config_top_COTTON.yaml")
+    global config
+    config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
+    config['TUCK'] = True
+    config['VAL_CONFIG']['SCALE'] = 1
+    config['VAL_CONFIG']['MASK_ARM'] = False
+    global model_pkl
+    model_pkl = COTTON(config).cuda().train()
+    weight_path = os.path.join(cotton_dir, "code/main/result/Top_1024x768_COTTON/weights/Top_1024x768_COTTON_1.pkl")
+    checkpoint = torch.load(weight_path, map_location='cpu')
+    model_pkl.load_state_dict(checkpoint['state_dict'])
+    model_pkl.cuda().eval()
+    print("Model loaded")
 
     with gr.Blocks() as demo:
         gr.Markdown("# Virtual Try-on")
