@@ -8,6 +8,7 @@ import shutil
 import fnmatch
 import time
 from PIL import Image
+import cv2
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -19,6 +20,87 @@ from torch.utils.data import DataLoader
 
 from main.dataLoader import TryonDataset
 from main.model_end2end import COTTON
+
+from preprocessing.CIHP_PARSING.human_parse import ImageReader, decode_labels_inside
+
+import tensorflow.compat.v1 as tf # type: ignore
+tf.disable_v2_behavior()
+
+N_CLASSES = 20
+
+def parsing_init_():
+    # Print GPUs available
+    print(tf.config.list_physical_devices('GPU'))
+
+    # Adjusting percentage of GPU available for tensorflow
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)#0.2)
+    config = tf.ConfigProto(gpu_options=gpu_options)
+
+    # Build graph with pre-saved graph and GPU settings
+    parsing_graph = tf.Graph()
+    with parsing_graph.as_default():
+        od_graph_def = tf.GraphDef()
+        with tf.gfile.GFile(FROZEN_MODEL_PATH, 'rb') as fid:
+            serialized_graph = fid.read()
+            od_graph_def.ParseFromString(serialized_graph)
+            _ = tf.import_graph_def(od_graph_def, name='')
+        parsing_sess = tf.Session(graph=parsing_graph, config=config)
+        # Initialization
+        init = tf.global_variables_initializer()
+        parsing_sess.run(init)
+    return parsing_sess, parsing_graph
+
+def parsing_init(input_dir, parsing_graph, parsing_sess):
+    data_list = os.listdir(input_dir)
+
+    # Load reader.
+    with parsing_graph.as_default():
+        with tf.name_scope("create_inputs"):
+            image, image_list = ImageReader(input_dir, data_list, None, None, False, False, False)
+            image_rev = tf.reverse(image, tf.stack([1]))
+
+        image_batch = tf.stack([image, image_rev])
+
+    image_tensor_detect = parsing_graph.get_tensor_by_name('stack:0')
+    pred_all = parsing_graph.get_tensor_by_name('ExpandDims_1:0')
+    
+    return image_tensor_detect, image_batch, pred_all, data_list
+
+def cihp_parsing_gen(input_dir, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'vis'), exist_ok=True)
+
+    image_tensor_detect, image_batch, pred_all, data_list = parsing_init(input_dir, parsing_graph, parsing_sess)
+    # For multi-thread processing
+    print("=================Start multi-thread processing==============================")
+    coord = tf.train.Coordinator()
+    threads = tf.train.start_queue_runners(coord=coord, sess=parsing_sess)
+    
+    print("Start for")
+    for step in range(len(data_list)):
+        start_time = time.time()
+        print("start eval")
+        image_numpy = image_batch.eval(session=parsing_sess) 
+        print("end eval")
+        parsing_= parsing_sess.run(pred_all,feed_dict={image_tensor_detect: image_numpy})   
+        print("end run")
+
+        msk = decode_labels_inside(parsing_, num_classes=N_CLASSES)
+        print("end decode")
+        parsing_im = Image.fromarray(msk[0])
+        file_id = data_list[step][:-4]
+        parsing_im.save('{}/vis/{}.png'.format(output_dir, file_id))
+        cv2.imwrite('{}/{}.png'.format(output_dir, file_id), parsing_[0,:,:,0])
+        
+        if step == 0:
+            print("step {} | cost {} sec".format(step, time.time()-start_time))
+        else:
+            print("\r step [{}/{}] | cost {} sec".format(step, len(data_list), time.time()-start_time), end=" ")
+        
+    # # Stop all thread, ready to finish
+    # coord.request_stop()
+    # coord.join(threads)
+
 
 def copy_file_by_name(src_dir, dst_dir, file_name):
     """
@@ -189,12 +271,16 @@ def run_preprocess_model(brand):
     subprocess.run(["python", "openpose_select.py", "--brand", brand], check=True)
 
     print("========= CIHP Parsing =========")
-    os.chdir(os.path.join(preprocess_dir, "CIHP_PARSING"))
-    subprocess.run([
-        "python", "human_parse.py",
-        "--brand", brand
-    ], check=True)
-    os.chdir(preprocess_dir)
+    # os.chdir(os.path.join(preprocess_dir, "CIHP_PARSING"))
+    # subprocess.run([
+    #     "python", "human_parse.py",
+    #     "--brand", brand
+    # ], check=True)
+    # os.chdir(preprocess_dir)
+    # Execute CIHP Parsing
+    in_cihp_parsing_path = os.path.join(Data_path, 'pose_filtered_Data', brand, 'VTON_Test_Gradio', 'model')
+    out_cihp_parsing_path = os.path.join(Data_path, 'pose_filtered_Data', brand, 'VTON_Test_Gradio', 'CIHP')
+    cihp_parsing_gen(in_cihp_parsing_path, out_cihp_parsing_path)
 
     print("========= Parse Select =========")
     subprocess.run(["python", "parse_select.py", "--brand", brand], check=True)
@@ -373,7 +459,8 @@ def main():
     for product in os.listdir(example_product_path):
         if product.endswith(".jpg"):
             example_product_list.append([os.path.join(example_product_path, product), product])
-
+    
+    # Load model inference
     config_path = os.path.join(cotton_dir, "code", "main", "configs", "config_top_COTTON.yaml")
     global config
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
@@ -386,7 +473,14 @@ def main():
     checkpoint = torch.load(weight_path, map_location='cpu')
     model_pkl.load_state_dict(checkpoint['state_dict'])
     model_pkl.cuda().eval()
-    print("Model loaded")
+    print("Model Inference loaded")
+
+    # Load parsing model(CIHP Parsing)
+    global FROZEN_MODEL_PATH
+    FROZEN_MODEL_PATH = os.path.join(preprocess_dir, "CIHP_PARSING/checkpoint/CIHP_pgn/frozen_inference_graph_GPU.pb")
+    global parsing_sess, parsing_graph, coord, threads
+    parsing_sess, parsing_graph = parsing_init_()
+    print("Parsing model loaded")
 
     with gr.Blocks() as demo:
         gr.Markdown("# Virtual Try-on")
