@@ -18,7 +18,8 @@ import torch.nn as nn
 from torch.nn import functional as F
 # Note here we adopt the InplaceABNSync implementation from https://github.com/mapillary/inplace_abn
 # By default, the InplaceABNSync module contains a BatchNorm Layer and a LeakyReLu layer
-from modules import InPlaceABNSync
+# from modules import InPlaceABNSync
+from preprocessing.Self_Correction_Human_Parsing.modules import InPlaceABNSync
 
 BatchNorm2d = functools.partial(InPlaceABNSync, activation='none')
 

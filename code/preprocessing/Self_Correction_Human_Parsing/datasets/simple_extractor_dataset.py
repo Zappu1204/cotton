@@ -16,7 +16,8 @@ import cv2
 import numpy as np
 
 from torch.utils import data
-from utils.transforms import get_affine_transform
+# from utils.transforms import get_affine_transform
+from preprocessing.Self_Correction_Human_Parsing.utils.transforms import get_affine_transform
 
 
 class SimpleFolderDataset(data.Dataset):
