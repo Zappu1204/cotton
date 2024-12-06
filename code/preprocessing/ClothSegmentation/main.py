@@ -9,9 +9,11 @@ import os
 from tqdm import tqdm
 import argparse
 from torch.utils.data import DataLoader
-from dataLoader import Neckline_dataset, Cloth_Segmentation_Dataset
+# from dataLoader import Neckline_dataset, Cloth_Segmentation_Dataset
+from preprocessing.ClothSegmentation.dataLoader import Neckline_dataset, Cloth_Segmentation_Dataset
 import torchvision.models as models
-from mean_iou_evaluate import read_masks, mean_iou_score
+# from mean_iou_evaluate import read_masks, mean_iou_score
+from preprocessing.ClothSegmentation.mean_iou_evaluate import read_masks, mean_iou_score
 import imageio
 import shutil
 import cv2
@@ -299,8 +301,7 @@ def test(opt):
         cv2.imwrite('{}/{}.png'.format(output_folder_vis, imgName),superimposed_img)
         imageio.imwrite('{}/{}.png'.format(output_folder, imgName),prediction)  
 
-
-if __name__ == '__main__':
+def main():
     start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode",
@@ -353,3 +354,58 @@ if __name__ == '__main__':
     else:
         test(opt)
         print('ClothSegmentation time: {:.4f}'.format(time.time() - start))
+
+def clothsegmentation_py(mode, brand):
+    start = time.time()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode",
+                        type=str,
+                        choices=['train', 'test', 'valid', 'preprocess'],
+                        default=mode,
+                        # required=True,
+                        help="operation mode")
+    parser.add_argument("--weights_path",
+                        type=str,
+                        default='weights/{}.pkl'.format(full_weight_name),
+                        help="model path for inference")
+    parser.add_argument("--input_dir",
+                        type=str,
+                        default='product/product',
+                        help="model path for inference")
+    parser.add_argument("--output_dir",
+                        type=str,
+                        default='product/product_parsing',
+                        help="model path for inference")
+    parser.add_argument("--n_epochs",
+                        type=int,
+                        default=2000,
+                        help="number of epochs of training")
+    parser.add_argument("--batch_size",
+                        type=int,
+                        default=2,
+                        help="size of the batches")
+    parser.add_argument("--lr",
+                        type=float,
+                        # default=0.00005,
+                        default=0.001,
+                        help="adam: learning rate")
+    parser.add_argument("--root",
+                        type=str,
+                        default='Training_Dataset/1024x768')
+    parser.add_argument("--brand",
+                        type=str,
+                        default=brand)
+
+    opt = parser.parse_args()
+    print(opt)
+
+    if opt.mode == 'train':
+        train(opt)
+    elif opt.mode == 'valid':
+        validate(opt)
+    else:
+        test(opt)
+        print('ClothSegmentation time: {:.4f}'.format(time.time() - start))
+
+if __name__ == '__main__':
+    main()    

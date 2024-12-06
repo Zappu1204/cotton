@@ -16,8 +16,10 @@ import os
 import json
 import cv2
 
-from utils.coco_process_utils import clean_annot, get_ignore_mask, get_heatmap, get_paf, get_keypoints, FLIP_INDICES
-from utils.process_utils import flip, resize, color_augment, resize_hm_paf, normalize, affine_augment
+# from utils.coco_process_utils import clean_annot, get_ignore_mask, get_heatmap, get_paf, get_keypoints, FLIP_INDICES
+# from utils.process_utils import flip, resize, color_augment, resize_hm_paf, normalize, affine_augment
+from preprocessing.Cloth2Skeleton.utils.coco_process_utils import clean_annot, get_ignore_mask, get_heatmap, get_paf, get_keypoints, FLIP_INDICES
+from preprocessing.Cloth2Skeleton.utils.process_utils import flip, resize, color_augment, resize_hm_paf, normalize, affine_augment
 
 
 def padRightDownCorner(img, stride, padValue):

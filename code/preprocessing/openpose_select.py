@@ -104,7 +104,7 @@ def openpose_check(opt):
         total_garbage += temp_garbage
     print("Total disgard {} images.".format(total_garbage))
 
-if __name__ == "__main__":
+def main():
     import time
     start = time.time()
     parser = argparse.ArgumentParser()
@@ -124,3 +124,27 @@ if __name__ == "__main__":
     openpose_check(opt)
 
     print("Openpose select time: {:.4f}".format(time.time() - start))
+
+def openpose_select_py(brand):
+    import time
+    start = time.time()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--brand",
+                        type=str,
+                        default=brand)
+    parser.add_argument("--cat",
+                        type=str,
+                        default=None)
+    parser.add_argument("--root",
+                        type=str,
+                        default='')  
+    parser.add_argument("--nocheck", action='store_true')
+    parser.add_argument("--multi-product", action='store_true')          
+    opt = parser.parse_args()
+
+    openpose_check(opt)
+
+    print("Openpose select time: {:.4f}".format(time.time() - start))
+
+if __name__ == "__main__":
+    main()

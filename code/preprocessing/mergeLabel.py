@@ -160,9 +160,8 @@ def merge_label(opt):
         CIHP_folder = os.path.join(data_folder, cat, 'CIHP')
         ATR_folder = os.path.join(data_folder, cat, 'ATR')
         merge_20to15(CIHP_folder, ATR_folder, tar_dir)
-        
 
-if __name__=='__main__':
+def main():
     import time
     start_time = time.time()
     parser = argparse.ArgumentParser()
@@ -179,3 +178,24 @@ if __name__=='__main__':
 
     merge_label(opt)
     print('Merge label time: {:.4f}'.format(time.time() - start_time))
+
+def merge_label_py(brand):
+    import time
+    start_time = time.time()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--brand",
+                        type=str,
+                        default=brand)
+    parser.add_argument("--cat",
+                        type=str,
+                        default=None)
+    parser.add_argument("--root",
+                        type=str,
+                        default='parse_filtered_Data')
+    opt = parser.parse_args()
+
+    merge_label(opt)
+    print('Merge label time: {:.4f}'.format(time.time() - start_time))    
+
+if __name__=='__main__':
+    main()

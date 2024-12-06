@@ -10,8 +10,10 @@ import os
 from tqdm import tqdm
 import argparse
 from torch.utils.data import DataLoader 
-from dataLoader import ClothDataset
-from model import bodypose_model
+# from dataLoader import ClothDataset
+from preprocessing.Cloth2Skeleton.dataLoader import ClothDataset
+# from model import bodypose_model
+from preprocessing.Cloth2Skeleton.model import bodypose_model
 import torch.nn.functional as F
 import random
 import matplotlib.pyplot as plt
@@ -21,7 +23,8 @@ import json
 import torchvision
 import cv2
 import math
-from post import decode_pose
+# from post import decode_pose
+from preprocessing.Cloth2Skeleton.post import decode_pose
 import yaml
 
 # transfer caffe model to pytorch which will match the layer name
@@ -293,9 +296,7 @@ def test(config):
         with open(os.path.join(config['TEST_CONFIG']['OUTPUT_DIR'], '{}_keypoints.json'.format(imgNames[0])), 'w') as f:
             json.dump(pose_format, f)
 
-
-
-if __name__ == '__main__':
+def main():
     start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode",
@@ -343,3 +344,53 @@ if __name__ == '__main__':
         test(config)
         print('Cloth2Skeleton time: {:.4f}'.format(time.time()-start))
 
+def cloth2skeleton_py(mode, config_file, brand):
+    start = time.time()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode",
+                        type=str,
+                        default=mode,
+                        help="operation mode")
+    parser.add_argument("--input_dir",
+                        type=str,
+                        default='product/product')
+    parser.add_argument("--output_dir",
+                        type=str,
+                        default='product/product_pose')
+    parser.add_argument("--config",
+                        type=str,
+                        default=config_file)
+    parser.add_argument("--vis",
+                        type=bool,
+                        default=False)
+    parser.add_argument("--brand",
+                        type=str,
+                        default=brand)
+    parser.add_argument("--root",
+                        type=str,
+                        default='Training_Dataset/1024x768')
+    opt = parser.parse_args()
+
+    file_path = os.path.abspath(__file__)
+    code_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(file_path))))
+    Data_path = os.path.join(code_path, 'Data')
+    data_folder = os.path.join(Data_path, opt.root, opt.brand)
+
+    config = yaml.load(open(opt.config, 'r'), Loader=yaml.FullLoader)
+    config['MODE'] = opt.mode
+    config['TRAINING_CONFIG']['VIS'] = opt.vis
+    config['TEST_CONFIG']['INPUT_DIR'] = os.path.join(data_folder, opt.input_dir)
+    config['TEST_CONFIG']['OUTPUT_DIR'] = os.path.join(data_folder, opt.output_dir)
+
+    print(opt)
+
+    if opt.mode == 'train':
+        train(config)
+    elif opt.mode == 'val':
+        val(config)
+    elif opt.mode == 'test':
+        test(config)
+        print('Cloth2Skeleton time: {:.4f}'.format(time.time()-start))
+
+if __name__ == '__main__':
+    main()

@@ -9,7 +9,8 @@ import os
 from tqdm import tqdm
 import argparse
 from torch.utils.data import DataLoader
-from dataLoader import Sleeve_Dataset
+# from dataLoader import Sleeve_Dataset
+from preprocessing.Sleeve_Classifier.dataLoader import Sleeve_Dataset
 import torchvision.models as models
 import cv2
 import json
@@ -220,7 +221,7 @@ def test(opt):
             with open(save_info_name, 'w') as f:
                 json.dump(info_format, f)
 
-if __name__ == '__main__':
+def main():
     start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode",
@@ -277,3 +278,65 @@ if __name__ == '__main__':
         print("Product Classification Time {:.4f}".format(time.time() - start_time))
     else:
         test(opt)
+
+def sleeve_classifier_py(mode, brand):
+    import time
+    start_time = time.time()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode",
+                        type=str,
+                        choices=['train', 'val', 'test', 'preprocess'],
+                        default=mode,
+                        # required=True,
+                        help="operation mode")
+    parser.add_argument("--weights_path",
+                        type=str,
+                        default='weights/{}.pkl'.format(full_weight_name),
+                        help="model path for inference")
+    parser.add_argument("--n_epochs",
+                        type=int,
+                        default=50,
+                        help="number of epochs of training")
+    parser.add_argument("--batch_size",
+                        type=int,
+                        default=32,
+                        help="size of the batches")
+    parser.add_argument("--lr",
+                        type=float,
+                        default=1e-4,
+                        # default=0.016,
+                        help="adam: learning rate")
+    parser.add_argument("--input_dir", type=str)
+    parser.add_argument("--output_dir", type=str)
+    parser.add_argument("--brand", type=str, default=brand)
+    parser.add_argument("--vis", type=bool, default=False)
+    parser.add_argument("--cat", type=str, default=None)
+
+    opt = parser.parse_args()
+    print(opt)
+
+    if opt.mode == 'train':
+        train(opt)
+    elif opt.mode == 'val':
+        val(opt)
+    elif opt.mode == 'preprocess':
+        import time
+        opt.mode = 'test'
+        file_path = os.path.abspath(__file__)
+        code_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(file_path))))
+        Data_path = os.path.join(code_path, 'Data')
+        data_folder = os.path.join(Data_path, 'parse_filtered_Data', opt.brand)
+        # data_folder = os.path.join('../parse_filtered_Data', opt.brand)
+        cats = [opt.cat] if opt.cat else [os.path.basename(cat) for cat in glob.glob(os.path.join(data_folder, '*'))]
+        for cat in cats:
+            print(cat)
+            cat_folder = os.path.join(data_folder, cat)
+            opt.input_dir = os.path.join(cat_folder, 'product')
+            opt.output_dir = os.path.join(cat_folder, 'product_info')
+            test(opt)
+        print("Product Classification Time {:.4f}".format(time.time() - start_time))
+    else:
+        test(opt)
+
+if __name__ == '__main__':
+    main()

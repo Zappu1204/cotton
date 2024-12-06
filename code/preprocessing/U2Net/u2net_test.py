@@ -13,13 +13,15 @@ import numpy as np
 from PIL import Image
 import glob
 
-from data_loader import RescaleT
-from data_loader import ToTensor
-from data_loader import ToTensorLab
-from data_loader import SalObjDataset
+# from data_loader import RescaleT
+# from data_loader import ToTensor
+# from data_loader import ToTensorLab
+# from data_loader import SalObjDataset
+from preprocessing.U2Net.data_loader import RescaleT, ToTensor, ToTensorLab, SalObjDataset
 
-from model import U2NET # full size version 173.6 MB
-from model import U2NETP # small version u2net 4.7 MB
+# from model import U2NET # full size version 173.6 MB
+# from model import U2NETP # small version u2net 4.7 MB
+from preprocessing.U2Net.model import U2NET, U2NETP
 import argparse
 from tqdm import tqdm
 import cv2
@@ -129,7 +131,7 @@ def main(opt):
 
             del d1,d2,d3,d4,d5,d6,d7
 
-if __name__ == "__main__":
+def main():
     start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--brand",
@@ -144,3 +146,22 @@ if __name__ == "__main__":
     opt = parser.parse_args()
     main(opt)
     print("Product mask generation (U2Net) Time: {:.4f}".format(time.time() - start))
+
+def u2net_test_py(brand):
+    start = time.time()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--brand",
+                        type=str,
+                        default=brand)
+    parser.add_argument("--cat",
+                        type=str,
+                        default=None)
+    parser.add_argument("--root",
+                        type=str,
+                        default='parse_filtered_Data')          
+    opt = parser.parse_args()
+    main(opt)
+    print("Product mask generation (U2Net) Time: {:.4f}".format(time.time() - start))
+
+if __name__ == "__main__":
+    main()

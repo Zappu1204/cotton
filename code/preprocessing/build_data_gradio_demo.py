@@ -323,9 +323,7 @@ def build_dataset(opt):
     # alignProduct(data_folder, product_folder, shape=(opt.h, opt.w), cloth_type=opt.brand.split('_')[-1])
     # train_val_split(data_folder, output_folder)
 
-
-
-if __name__=='__main__':
+def main():
     import time
     start_time = time.time()
     parser = argparse.ArgumentParser()
@@ -341,8 +339,32 @@ if __name__=='__main__':
     parser.add_argument("-m", "--mode", type=str, default='p_model', choices=['p_model', 'p_product', 'train_val_split'])
     parser.add_argument("--h", type=int, default=1024)          
     parser.add_argument("--w", type=int, default=768)          
-    parser.add_argument("--keep_order", type=bool, default=False)          
+    parser.add_argument("--keep_order", type=bool, default=False)   
     opt = parser.parse_args()
     build_dataset(opt)
-
     print('Build form data time: {:.4f}'.format(time.time() - start_time))
+
+def build_data_gradio_demo_py(brand, mode, h=1024, w=768):
+    import time
+    start_time = time.time()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--brand",
+                        type=str,
+                        default=brand)
+    parser.add_argument("--cat",
+                        type=str,
+                        default=None)
+    parser.add_argument("--root",
+                        type=str,
+                        default='parse_filtered_Data')
+    parser.add_argument("-m", "--mode", type=str, default=mode, choices=['p_model', 'p_product', 'train_val_split'])
+    parser.add_argument("--h", type=int, default=h)          
+    parser.add_argument("--w", type=int, default=w)          
+    parser.add_argument("--keep_order", type=bool, default=False)
+    global opt   
+    opt = parser.parse_args()
+    build_dataset(opt)
+    print('Build form data time: {:.4f}'.format(time.time() - start_time))
+
+if __name__=='__main__':
+    main()

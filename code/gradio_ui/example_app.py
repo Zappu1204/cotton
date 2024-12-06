@@ -1,6 +1,7 @@
 import gradio as gr
 import subprocess
 import os
+import docker
 import sys
 from tqdm import tqdm
 import yaml
@@ -222,6 +223,7 @@ def run_inference(brand):
             c_img = torch.cat([c_torso, c_aux], dim=1)
             parsing_pred, parsing_pred_hard, tryon_img_fakes = model_pkl(c_img, human_parse_masked, human_masked, human_pose)
         fid_pred_folder = os.path.join(cotton_dir, "code/main/result/Top_1024x768_COTTON", mode, brand, "1")
+        os.makedirs(fid_pred_folder, exist_ok=True)
         for idx, tryon_img_fake in enumerate(tryon_img_fakes):
             utils.imsave_trainProcess([utils.remap(tryon_img_fake)], os.path.join(fid_pred_folder, c_name[idx]))
 
@@ -255,20 +257,54 @@ def preprocess_model(model, brand):
 
 def run_preprocess_model(brand):
     start_time = time.time()
-    os.chdir(preprocess_dir)
+    # os.chdir(preprocess_dir)
+    from preprocessing.openpose_select import openpose_select_py
+    from preprocessing.parse_select import parse_select_py
+    from preprocessing.Self_Correction_Human_Parsing.simple_extractor_for_preprocessing import simple_extractor_for_preprocessing_py
+    from preprocessing.mergeLabel import merge_label_py
+    from preprocessing.build_data_gradio_demo import build_data_gradio_demo_py
 
     print(f"========= Find pose for {brand} =========")
-    # Start Docker container
-    subprocess.run(["docker", "start", "openpose"], check=True)
-    # Execute find_pose.sh inside Docker
-    subprocess.run([
-        "docker", "exec", "-it", "openpose", "bash", "-c",
-        f"bash find_pose.sh -b {brand}"
-    ], check=True)
-
-    # Run Python scripts
+    container_name = "openpose"
+    command_to_run = f"bash find_pose.sh -b {brand}"
+    try:
+        client = docker.from_env()
+        try:
+            client.ping()
+            print("Docker is running")
+        except docker.errors.APIError as e:
+            raise Exception("Docker is not running")
+        
+        try:
+            container = client.containers.get(container_name)
+            print(f"Container {container_name} exists")
+        except docker.errors.NotFound as e:
+            raise Exception(f"Container {container_name} does not exist")
+        
+        if container.status != "running":
+            print(f"Container {container_name} is not running")
+            try:
+                container.start()
+                time.sleep(3)
+            except docker.errors.APIError as e:
+                raise Exception(f"Error starting container {container_name}")
+        
+        try:
+            exit_code, output = container.exec_run(
+                cmd=command_to_run, 
+                tty=True,
+            )
+            print(f"Result: {exit_code}, {output}")
+            if exit_code != 0:
+                raise Exception(f"Error running command {command_to_run}")
+        except docker.errors.APIError as e:
+            raise Exception(f"Error executing command {command_to_run}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return
+    
     print("========= Openpose Select =========")
-    subprocess.run(["python", "openpose_select.py", "--brand", brand], check=True)
+    openpose_select_py(brand)
 
     print("========= CIHP Parsing =========")
     # os.chdir(os.path.join(preprocess_dir, "CIHP_PARSING"))
@@ -283,38 +319,18 @@ def run_preprocess_model(brand):
     cihp_parsing_gen(in_cihp_parsing_path, out_cihp_parsing_path)
 
     print("========= Parse Select =========")
-    subprocess.run(["python", "parse_select.py", "--brand", brand], check=True)
+    parse_select_py(brand)
 
     print("========= ATR Generation and Parsing Merge =========")
-    os.chdir(os.path.join(preprocess_dir, "Self-Correction-Human-Parsing"))
-    subprocess.run([
-        "python", "simple_extractor_for_preprocessing.py",
-        "--dataset", "atr",
-        "--model-restore", "exp-schp-201908301523-atr.pth",
-        "--brand", brand
-    ], check=True)
-    os.chdir(preprocess_dir)
+    restore_model_atr = os.path.join(preprocess_dir, "Self_Correction_Human_Parsing/exp-schp-201908301523-atr.pth")
+    simple_extractor_for_preprocessing_py("atr", restore_model_atr, brand)
 
     print("========= Merge Label =========")
-    subprocess.run(["python", "mergeLabel.py", "--brand", brand], check=True)
+    merge_label_py(brand)
 
     print("========= Build Data Gradio Demo =========")
-    subprocess.run([
-        "python", "build_data_gradio_demo.py",
-        "--brand", brand,
-        "--mode", "p_model",
-        "--h", "1024",
-        "--w", "768"
-    ], check=True)
-
-    print("========= Build Data Gradio Demo =========")
-    subprocess.run([
-        "python", "build_data_gradio_demo.py",
-        "--brand", brand,
-        "--mode", "train_val_split",
-        "--h", "1024",
-        "--w", "768"
-    ], check=True)
+    build_data_gradio_demo_py(brand, "p_model", 1024, 768)
+    build_data_gradio_demo_py(brand, "train_val_split", 1024, 768)
 
     end_time = time.time()
     preprocess_model_elapsed_time = end_time - start_time
@@ -345,6 +361,12 @@ def preprocess_product(product, brand):
         return f"An error occurred: {e}"
 
 def run_preprocess_product(product_dir, brand):
+    from preprocessing.U2Net.u2net_test import u2net_test_py
+    from preprocessing.Sleeve_Classifier.main import sleeve_classifier_py
+    from preprocessing.build_data_gradio_demo import build_data_gradio_demo_py
+    from preprocessing.Cloth2Skeleton.main import cloth2skeleton_py
+    from preprocessing.ClothSegmentation.main import clothsegmentation_py
+
     start_time = time.time()
     parser_path = os.path.join(cotton_dir, "Data", "parse_filtered_Data", brand, "VTON_Test_Gradio")
     if not os.path.exists(parser_path):
@@ -364,50 +386,20 @@ def run_preprocess_product(product_dir, brand):
     shutil.copytree(product_dir, parser_path)
 
     print("========= Product mask generation (U2Net) =========")
-    os.chdir(os.path.join(preprocess_dir, "U2Net"))
-    subprocess.run([
-        "python", "u2net_test.py", 
-        "--brand", brand,
-
-    ], check=True)
-    os.chdir(preprocess_dir)
+    u2net_test_py(brand)
 
     print("========= Product Classification =========")
-    os.chdir(os.path.join(preprocess_dir, "Sleeve_Classifier"))
-    subprocess.run([
-        "python", "main.py",
-        "--mode", "preprocess",
-        "--brand", brand
-    ], check=True)
-    os.chdir(preprocess_dir)
+    sleeve_classifier_py("preprocess", brand)
 
     print("========= Build Data Gradio Demo =========")
-    subprocess.run([
-        "python", "build_data_gradio_demo.py",
-        "--brand", brand,
-        "--mode", "p_product",
-        "--h", "1024",
-        "--w", "768"
-    ], check=True)
+    build_data_gradio_demo_py(brand, "p_product", 1024, 768)
 
     print("========= Cloth2Skeleton =========")
-    os.chdir(os.path.join(preprocess_dir, "Cloth2Skeleton"))
-    subprocess.run([
-        "python", "main.py",
-        "--mode", "test",
-        "--config", "configs/config_top_v2_allData_augT.yaml",
-        "--brand", brand
-    ], check=True)
-    os.chdir(preprocess_dir)
+    config_cloth2skel = os.path.join(preprocess_dir, "Cloth2Skeleton/configs/config_bottom_v2_allData_augT.yaml")
+    cloth2skeleton_py("test", config_cloth2skel, brand)
 
     print("========= ClothSegmentation =========")
-    os.chdir(os.path.join(preprocess_dir, "ClothSegmentation"))
-    subprocess.run([
-        "python", "main.py",
-        "--mode", "test",
-        "--brand", brand
-    ], check=True)
-    os.chdir(preprocess_dir)
+    clothsegmentation_py("test", brand)
 
     end_time = time.time()
     preprocess_product_elapsed_time = end_time - start_time
@@ -427,9 +419,8 @@ def info_product(img, product_name):
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    cotton_size_does_matter_dir = os.path.dirname(os.path.dirname(script_dir))
     global cotton_dir
-    cotton_dir = cotton_size_does_matter_dir
+    cotton_dir = os.path.dirname(os.path.dirname(script_dir))
     global preprocess_dir
     preprocess_dir = os.path.join(cotton_dir, "code", "preprocessing")
     global Data_path
@@ -460,6 +451,8 @@ def main():
         if product.endswith(".jpg"):
             example_product_list.append([os.path.join(example_product_path, product), product])
     
+    example_model_list.sort(key=lambda x: x[1])
+    example_product_list.sort(key=lambda x: x[1])
     # Load model inference
     config_path = os.path.join(cotton_dir, "code", "main", "configs", "config_top_COTTON.yaml")
     global config
@@ -482,7 +475,8 @@ def main():
     parsing_sess, parsing_graph = parsing_init_()
     print("Parsing model loaded")
 
-    with gr.Blocks() as demo:
+    kotaemon = gr.Theme.from_hub("lone17/kotaemon")
+    with gr.Blocks(theme=kotaemon) as demo:
         gr.Markdown("# Virtual Try-on")
         
         with gr.Row():
@@ -491,7 +485,7 @@ def main():
         with gr.Row():
             with gr.Column():
                 model_input = gr.Image(type="pil", label="Upload Model img")
-                model_button = gr.Button("Preprocess Model")
+                model_button = gr.Button("Preprocess Model", variant="secondary")
                 model_message = gr.Textbox(label="Model Notification", interactive=False)
                 model_name = gr.Textbox(label="Model Name", placeholder="Input to model name", visible=False)
                 example = gr.Examples(
@@ -504,7 +498,7 @@ def main():
                 )
             with gr.Column():
                 product_input = gr.Image(type="pil", label="Upload Product img",)
-                product_button = gr.Button("Preprocess Product")
+                product_button = gr.Button("Preprocess Product", variant="secondary")
                 product_message = gr.Textbox(label="Product Notification", interactive=False)
                 product_name = gr.Textbox(label="Product Name", placeholder="Input to product name", visible=False)
                 example = gr.Examples(
@@ -517,7 +511,7 @@ def main():
                 )
             with gr.Column():
                 output_image = gr.Image(label="Result img")
-                inference_button = gr.Button("Inference")
+                inference_button = gr.Button("Inference", variant="primary")
                 output_message = gr.Textbox(label="Infernce Notification", interactive=False)
 
         product_button.click(
@@ -538,7 +532,7 @@ def main():
             outputs=[output_image, output_message]
         )
 
-    demo.launch(share=False)
+    demo.launch(share=False, server_name="127.0.0.1", server_port=7861) 
 
 if __name__ == "__main__":
     main()

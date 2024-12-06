@@ -5,8 +5,8 @@ import matplotlib.cm
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter, maximum_filter
 from scipy.ndimage.morphology import generate_binary_structure
-from utils.coco_process_utils import BODY_PARTS_UPPERL as BODY_PARTS
-
+# from utils.coco_process_utils import BODY_PARTS_UPPERL as BODY_PARTS
+from preprocessing.Cloth2Skeleton.utils.coco_process_utils import BODY_PARTS_UPPERL as BODY_PARTS
 
 # It is better to use 0.1 as threshold when evaluation, but 0.3 for demo
 # purpose.
